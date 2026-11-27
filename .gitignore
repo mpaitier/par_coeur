@@ -1,0 +1,12 @@
+.gradle/
+.kotlin/
+build/
+/local.properties
+/captures
+.externalNativeBuild/
+.cxx/
+*.iml
+.idea/
+.DS_Store
+# Firebase (à partir de la beta)
+google-services.json

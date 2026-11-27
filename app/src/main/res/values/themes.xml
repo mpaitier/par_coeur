@@ -1,0 +1,4 @@
+<resources>
+    <!-- Thème de la fenêtre uniquement, le vrai thème est en Compose (core/theme) -->
+    <style name="Theme.ParCoeur" parent="android:Theme.Material.Light.NoActionBar" />
+</resources>
