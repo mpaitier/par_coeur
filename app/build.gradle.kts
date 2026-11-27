@@ -19,7 +19,11 @@ val keystoreProperties = Properties().apply {
 
 android {
     namespace = "com.mpaitier.parcoeur"
-    compileSdk = 37
+    compileSdk {
+        version = release(37) {
+            minorApiLevel = 1
+        }
+    }
 
     defaultConfig {
         applicationId = "com.mpaitier.parcoeur"
