@@ -46,7 +46,7 @@ Pour lancer les mêmes vérifications que la CI :
 
 ![Modèle du domaine](docs/domain-model.drawio.svg)
 
-Le fichier s'ouvre et se modifie avec [draw.io](https://www.drawio.com/).
+Le fichier s'ouvre et se modifie dans VS Code avec l'extension [Draw.io Integration](https://marketplace.visualstudio.com/items?itemName=hediet.vscode-drawio), ou directement sur [draw.io](https://www.drawio.com/).
 
 ## Feuille de route
 
