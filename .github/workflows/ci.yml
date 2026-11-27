@@ -1,0 +1,95 @@
+# Style, lint et tests, puis build release, à chaque push sur main et sur
+# chaque pull request. Aucun secret nécessaire : sans key.properties, l'APK
+# release est signé avec la clé de debug et sert seulement à vérifier que
+# l'app compile en release (R8, lintVital).
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+# Le workflow ne fait que lire le code.
+permissions:
+  contents: read
+
+# Un nouveau push sur une PR annule l'exécution précédente.
+# Sur main, chaque exécution va au bout.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  analyze-and-test:
+    name: Style, lint et tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Récupérer le code
+        uses: actions/checkout@v7
+
+      # Vérifie que gradle-wrapper.jar est bien un jar officiel de Gradle.
+      - name: Valider le wrapper Gradle
+        uses: gradle/actions/wrapper-validation@v6
+
+      # AGP 9 demande Java 17 au minimum.
+      - name: Installer Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 17
+
+      # cache-provider basic : cache open source (MIT), sans le module
+      # propriétaire introduit en v6.
+      - name: Préparer Gradle
+        uses: gradle/actions/setup-gradle@v6
+        with:
+          cache-provider: basic
+
+      - name: Style (ktlint)
+        run: ./gradlew ktlintCheck
+
+      # warningsAsErrors dans app/build.gradle.kts : zéro avertissement.
+      - name: Lint Android
+        run: ./gradlew lintDebug
+
+      - name: Tests unitaires
+        run: ./gradlew testDebugUnitTest
+
+      # Même si une étape a échoué, pour pouvoir lire les rapports.
+      - name: Publier les rapports
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: rapports
+          path: |
+            app/build/reports/
+            app/build/test-results/
+          retention-days: 7
+          if-no-files-found: ignore
+
+  build-android:
+    name: Build Android
+    needs: analyze-and-test
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Récupérer le code
+        uses: actions/checkout@v7
+
+      - name: Installer Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Préparer Gradle
+        uses: gradle/actions/setup-gradle@v6
+        with:
+          cache-provider: basic
+
+      - name: APK release
+        run: ./gradlew assembleRelease

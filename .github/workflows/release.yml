@@ -1,0 +1,114 @@
+# Publication d'une version, déclenchée par un tag v* (v0.1.0-alpha.1,
+# v0.2.0-beta.1, v1.0.0). Construit l'AAB (Play Store) et l'APK
+# (installation directe) signés avec la clé d'envoi, puis crée la release
+# GitHub avec les deux fichiers et des notes générées à partir des PR
+# fusionnées depuis le tag précédent. Un tag avec un tiret donne une
+# préversion.
+#
+# Secrets attendus (Settings > Secrets and variables > Actions) :
+# - ANDROID_KEYSTORE_BASE64      clé d'envoi (.jks) encodée en base64
+# - ANDROID_KEYSTORE_PASSWORD    mot de passe du keystore
+# - ANDROID_KEY_ALIAS            alias de la clé (upload)
+# - ANDROID_KEY_PASSWORD         mot de passe de la clé
+# À partir de la beta, ajouter GOOGLE_SERVICES_JSON_BASE64
+# (app/google-services.json en base64).
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+# Création de la release : écriture sur le dépôt.
+permissions:
+  contents: write
+
+# Une release va toujours au bout.
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Build signé et release GitHub
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+
+    steps:
+      - name: Récupérer le code
+        uses: actions/checkout@v7
+
+      # v0.1.0-alpha.1 doit correspondre à versionName = "0.1.0-alpha.1"
+      # dans app/build.gradle.kts.
+      - name: Vérifier la version
+        id: version
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          version="$(grep -oP 'versionName\s*=\s*"\K[^"]+' app/build.gradle.kts)"
+          if [ "$tag" != "$version" ]; then
+            echo "::error::Le tag $GITHUB_REF_NAME ne correspond pas au versionName $version de app/build.gradle.kts"
+            exit 1
+          fi
+          echo "name=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Écrire la configuration depuis les secrets
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          missing=0
+          for name in ANDROID_KEYSTORE_BASE64 ANDROID_KEYSTORE_PASSWORD \
+                      ANDROID_KEY_ALIAS ANDROID_KEY_PASSWORD; do
+            if [ -z "${!name}" ]; then
+              echo "::error::Secret manquant : $name"
+              missing=1
+            fi
+          done
+          [ "$missing" -eq 0 ] || exit 1
+
+          echo "$ANDROID_KEYSTORE_BASE64" | base64 --decode > upload-keystore.jks
+
+          # storeFile est relatif à la racine du projet.
+          cat > key.properties <<EOF
+          storeFile=upload-keystore.jks
+          storePassword=$ANDROID_KEYSTORE_PASSWORD
+          keyAlias=$ANDROID_KEY_ALIAS
+          keyPassword=$ANDROID_KEY_PASSWORD
+          EOF
+
+      - name: Installer Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Préparer Gradle
+        uses: gradle/actions/setup-gradle@v6
+        with:
+          cache-provider: basic
+
+      - name: Tests
+        run: ./gradlew testDebugUnitTest
+
+      - name: AAB et APK signés
+        run: ./gradlew bundleRelease assembleRelease
+
+      - name: Rassembler les fichiers
+        run: |
+          mkdir -p dist
+          cp app/build/outputs/bundle/release/app-release.aab "dist/par-coeur-${{ steps.version.outputs.name }}.aab"
+          cp app/build/outputs/apk/release/app-release.apk "dist/par-coeur-${{ steps.version.outputs.name }}.apk"
+
+      # Un tag avec un tiret (v0.1.0-alpha.1) donne une préversion.
+      - name: Créer la release GitHub
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          prerelease=""
+          case "$GITHUB_REF_NAME" in *-*) prerelease="--prerelease" ;; esac
+          gh release create "$GITHUB_REF_NAME" dist/* \
+            --title "Par cœur $GITHUB_REF_NAME" \
+            --generate-notes \
+            --verify-tag \
+            $prerelease

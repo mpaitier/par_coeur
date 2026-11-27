@@ -8,5 +8,11 @@ build/
 *.iml
 .idea/
 .DS_Store
+
+# Signature release
+key.properties
+*.jks
+*.keystore
+
 # Firebase (à partir de la beta)
 google-services.json
