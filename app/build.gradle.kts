@@ -1,5 +1,5 @@
-import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import java.util.Properties
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 // Kotlin est intégré à AGP 9 : pas besoin du plugin org.jetbrains.kotlin.android
 plugins {

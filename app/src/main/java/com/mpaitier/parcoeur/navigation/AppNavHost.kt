@@ -10,8 +10,8 @@ import com.mpaitier.parcoeur.features.course.presentation.screens.CourseListScre
 fun AppNavHost() {
     val navController = rememberNavController()
 
-    NavHost(navController = navController, startDestination = CourseList) {
-        composable<CourseList> {
+    NavHost(navController = navController, startDestination = Route.CourseList) {
+        composable<Route.CourseList> {
             CourseListScreen()
         }
     }

@@ -8,7 +8,7 @@ plugins {
 // Règles réglées dans .editorconfig.
 //   .\gradlew ktlintCheck    vérifie le style
 //   .\gradlew ktlintFormat   corrige automatiquement ce qui peut l'être
-val ktlint: Configuration by configurations.creating
+val ktlint: Configuration = configurations.create("ktlint")
 
 dependencies {
     ktlint(libs.ktlint.cli) {
